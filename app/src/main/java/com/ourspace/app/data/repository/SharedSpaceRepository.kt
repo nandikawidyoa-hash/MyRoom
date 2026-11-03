@@ -244,8 +244,7 @@ class SharedSpaceRepository @Inject constructor(
         val resolvedContent = when (strategy) {
             ConflictResolutionStrategy.KEEP_MINE -> note.content
             ConflictResolutionStrategy.KEEP_PARTNER -> partnerContent
-            ConflictResolutionStrategy.MERGE_BOTH ->
-                "${note.content} | [Merged Partner]: $partnerContent"
+            ConflictResolutionStrategy.MERGE_BOTH -> "${note.content} | [Merged Partner]: $partnerContent"
         }
         val resolvedEntity = note.copy(
             content = resolvedContent,

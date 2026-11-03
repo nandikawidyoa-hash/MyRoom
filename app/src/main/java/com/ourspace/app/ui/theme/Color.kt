@@ -25,7 +25,7 @@ object SoftRomanticTokens {
     val DeepRose = Color(0xFFB87391)
     val SoftSage = Color(0xFFD8EAD8)
     val WarmAmber = Color(0xFFF7DFBA)
-    val GentleCoral = Color(0xFFE58F8F)
+    valGentleCoral = Color(0xFFE58F8F)
 
     // Note custom colors (for Personal & Shared Notes)
     val NoteBlush = Color(0xFFFDF0F6)
@@ -112,7 +112,7 @@ val PinkRomanticColors = OurSpaceSemanticColors(
 val LavenderRomanticColors = OurSpaceSemanticColors(
     backgroundPrimary = Color(0xFFF7F4FC),
     backgroundSecondary = SoftRomanticTokens.Lavender,
-    cardSurface = Color(0xFFFCFAFF),
+    cardSurface = Color(0xFFFCFaff),
     glassSurface = SoftRomanticTokens.Lavender.copy(alpha = 0.65f),
     glassBorder = Color(0xFFD0C0EA),
     primaryAccent = Color(0xFFA589C9),

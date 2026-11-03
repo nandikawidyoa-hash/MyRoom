@@ -167,8 +167,7 @@ fun HomeDashboardScreen(
                 text = "Bagikan Jawaban ke Our Space",
                 onClick = {
                     if (dailyAnswer.isNotBlank()) {
-                        viewModel.sendLoveNote("DAILY_QUESTION", "Q: $dailyQuestion
-A: $dailyAnswer")
+                        viewModel.sendLoveNote("DAILY_QUESTION", "Q: $dailyQuestion - A: $dailyAnswer")
                         dailyAnswer = ""
                     }
                 }

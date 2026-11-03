@@ -1,6 +1,7 @@
 package com.ourspace.app.di
 
 import android.content.Context
+import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
@@ -14,9 +15,9 @@ import com.ourspace.app.data.repository.SharedSpaceRepository
 import com.ourspace.app.ui.viewmodel.OurSpaceMainViewModel
 
 object OurSpaceContainer {
-    val personalDao: PersonalSpaceDao by lazy { PersonalSpaceDao() }
-    val sharedDao: SharedSpaceDao by lazy { SharedSpaceDao() }
-    val syncQueueDao: PendingSyncQueueDao by lazy { PendingSyncQueueDao() }
+    val personalDao: PersonalSpaceDao = PersonalSpaceDao()
+    val sharedDao: SharedSpaceDao = SharedSpaceDao()
+    val syncQueueDao: PendingSyncQueueDao = PendingSyncQueueDao()
 
     @Volatile
     private var instance: OurSpaceMainViewModel? = null
@@ -29,6 +30,10 @@ object OurSpaceContainer {
 
     private fun createViewModel(appContext: Context): OurSpaceMainViewModel {
         val prefsRepo = UserPreferencesRepository(appContext)
+
+        if (FirebaseApp.getApps(appContext).isEmpty()) {
+            FirebaseApp.initializeApp(appContext)
+        }
 
         val auth = FirebaseAuth.getInstance()
         val firestore = FirebaseFirestore.getInstance()

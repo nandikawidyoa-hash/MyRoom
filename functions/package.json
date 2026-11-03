@@ -1,0 +1,13 @@
+{
+  "name": "our-space-cloud-functions",
+  "version": "1.0.0",
+  "description": "Server-authoritative Cloud Functions for OUR SPACE",
+  "main": "index.js",
+  "engines": {
+    "node": "20"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.6.0",
+    "firebase-functions": "^6.1.0"
+  }
+}

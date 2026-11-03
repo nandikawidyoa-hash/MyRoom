@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "100000000001",
+    "firebase_url": "https://our-space-couple-universe-default-rtdb.firebaseio.com",
+    "project_id": "our-space-couple-universe",
+    "storage_bucket": "our-space-couple-universe.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:100000000001:android:23c0e1a7fc2ae67b",
+        "android_client_info": {
+          "package_name": "com.ourspace.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDemoPlaceholderKeyForLocalAndCIBuild000"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

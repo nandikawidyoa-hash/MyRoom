@@ -10,7 +10,6 @@ import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderF
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 
-@HiltAndroidApp
 class OurSpaceApplication : Application(), Configuration.Provider {
 
     @Inject

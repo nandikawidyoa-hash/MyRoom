@@ -41,7 +41,6 @@ import com.ourspace.app.ui.theme.OurSpaceTheme
 import com.ourspace.app.ui.viewmodel.OurSpaceMainViewModel
 import dagger.hilt.android.AndroidEntryPoint
 
-@AndroidEntryPoint
 class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -50,7 +49,7 @@ class MainActivity : FragmentActivity() {
         OfflineSyncWorker.schedulePeriodicSync(applicationContext)
 
         setContent {
-            val mainViewModel: OurSpaceMainViewModel = hiltViewModel()
+            val mainViewModel = com.ourspace.app.di.OurSpaceContainer.getViewModel(applicationContext)
             val prefs by mainViewModel.userPreferences.collectAsState()
 
             OurSpaceTheme(themeMode = prefs.themeMode) {

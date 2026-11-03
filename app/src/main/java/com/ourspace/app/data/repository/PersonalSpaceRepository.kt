@@ -12,11 +12,10 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.tasks.await
 import java.security.MessageDigest
 import java.util.UUID
-import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class PersonalSpaceRepository @Inject constructor(
+class PersonalSpaceRepository constructor(
     private val personalDao: PersonalSpaceDao,
     private val syncQueueDao: PendingSyncQueueDao,
     private val firestore: FirebaseFirestore

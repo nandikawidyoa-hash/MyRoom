@@ -14,11 +14,10 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 import java.security.SecureRandom
-import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class AuthPairingRepository @Inject constructor(
+class AuthPairingRepository constructor(
     private val auth: FirebaseAuth,
     private val firestore: FirebaseFirestore,
     private val storage: FirebaseStorage,

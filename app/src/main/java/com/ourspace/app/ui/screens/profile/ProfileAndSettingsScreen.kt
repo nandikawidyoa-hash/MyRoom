@@ -15,6 +15,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,6 +29,9 @@ import com.ourspace.app.ui.components.RomanticTextField
 import com.ourspace.app.ui.theme.AppThemeMode
 import com.ourspace.app.ui.theme.OurSpaceDesign
 import com.ourspace.app.ui.viewmodel.OurSpaceMainViewModel
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -42,7 +46,24 @@ fun ProfileAndSettingsScreen(
     var displayName by rememberSaveable { mutableStateOf(session.myDisplayName) }
     var myNickname by rememberSaveable { mutableStateOf(session.myNickname) }
     var partnerNickname by rememberSaveable { mutableStateOf(session.partnerNickname) }
+    var anniversaryStr by rememberSaveable {
+        val date = runCatching {
+            Instant.ofEpochMilli(session.anniversaryMillis).atZone(ZoneId.systemDefault()).toLocalDate()
+        }.getOrDefault(LocalDate.now().minusYears(1))
+        mutableStateOf(date.toString())
+    }
     var unpairConfirmation by rememberSaveable { mutableStateOf("") }
+
+    // Synchronize inputs with session state when loaded from preferences
+    LaunchedEffect(session.myDisplayName, session.myNickname, session.partnerNickname, session.anniversaryMillis) {
+        displayName = session.myDisplayName
+        myNickname = session.myNickname
+        partnerNickname = session.partnerNickname
+        val date = runCatching {
+            Instant.ofEpochMilli(session.anniversaryMillis).atZone(ZoneId.systemDefault()).toLocalDate()
+        }.getOrDefault(LocalDate.now().minusYears(1))
+        anniversaryStr = date.toString()
+    }
 
     Column(
         modifier = Modifier
@@ -53,6 +74,12 @@ fun ProfileAndSettingsScreen(
     ) {
         Text("Profile & Settings ⚙️", style = MaterialTheme.typography.headlineLarge, color = colors.textPrimary)
 
+        session.statusMessage?.let { status ->
+            RomanticGlassCard(modifier = Modifier.fillMaxWidth()) {
+                Text(status, style = MaterialTheme.typography.bodyMedium, color = colors.primaryAccent)
+            }
+        }
+
         RomanticGlassCard(modifier = Modifier.fillMaxWidth()) {
             Text("Profil Saya & Pasangan", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
             Spacer(Modifier.height(8.dp))
@@ -61,10 +88,30 @@ fun ProfileAndSettingsScreen(
             RomanticTextField(value = myNickname, onValueChange = { myNickname = it }, label = "Nickname Saya")
             Spacer(Modifier.height(8.dp))
             RomanticTextField(value = partnerNickname, onValueChange = { partnerNickname = it }, label = "Nickname Pasangan")
+            Spacer(Modifier.height(8.dp))
+            RomanticTextField(
+                value = anniversaryStr,
+                onValueChange = { anniversaryStr = it },
+                label = "Tanggal Jadian (Format: YYYY-MM-DD)"
+            )
             Spacer(Modifier.height(10.dp))
             RomanticPrimaryButton(
                 text = "Simpan Perubahan Profil",
-                onClick = { viewModel.updateProfileNames(displayName, myNickname, partnerNickname) }
+                onClick = {
+                    val parsedMillis = runCatching {
+                        LocalDate.parse(anniversaryStr.trim())
+                            .atStartOfDay(ZoneId.systemDefault())
+                            .toInstant()
+                            .toEpochMilli()
+                    }.getOrDefault(session.anniversaryMillis)
+
+                    viewModel.updateProfileAndAnniversary(
+                        displayName = displayName,
+                        nickname = myNickname,
+                        partnerNickname = partnerNickname,
+                        anniversaryMillis = parsedMillis
+                    )
+                }
             )
             Spacer(Modifier.height(8.dp))
             RomanticPrimaryButton(

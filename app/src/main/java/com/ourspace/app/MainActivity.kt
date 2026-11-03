@@ -26,8 +26,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
-import androidx.hilt.navigation.compose.hiltViewModel
 import com.ourspace.app.data.sync.OfflineSyncWorker
+import com.ourspace.app.di.OurSpaceContainer
 import com.ourspace.app.ui.navigation.BottomNavTab
 import com.ourspace.app.ui.screens.auth.AuthAndPairingScreen
 import com.ourspace.app.ui.screens.home.HomeDashboardScreen
@@ -39,7 +39,6 @@ import com.ourspace.app.ui.screens.profile.ProfileAndSettingsScreen
 import com.ourspace.app.ui.theme.OurSpaceDesign
 import com.ourspace.app.ui.theme.OurSpaceTheme
 import com.ourspace.app.ui.viewmodel.OurSpaceMainViewModel
-import dagger.hilt.android.AndroidEntryPoint
 
 class MainActivity : FragmentActivity() {
 
@@ -48,8 +47,9 @@ class MainActivity : FragmentActivity() {
         enableEdgeToEdge()
         OfflineSyncWorker.schedulePeriodicSync(applicationContext)
 
+        val mainViewModel = OurSpaceContainer.getViewModel(applicationContext)
+
         setContent {
-            val mainViewModel = com.ourspace.app.di.OurSpaceContainer.getViewModel(applicationContext)
             val prefs by mainViewModel.userPreferences.collectAsState()
 
             OurSpaceTheme(themeMode = prefs.themeMode) {

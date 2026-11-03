@@ -26,7 +26,6 @@ import com.ourspace.app.domain.model.InvitationCode
 import com.ourspace.app.domain.usecase.RelationshipCalculator
 import com.ourspace.app.domain.usecase.RelationshipStats
 import com.ourspace.app.ui.theme.AppThemeMode
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -36,7 +35,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 data class SessionState(
     val isAuthenticated: Boolean = true,
@@ -53,8 +51,7 @@ data class SessionState(
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
-@HiltViewModel
-class OurSpaceMainViewModel @Inject constructor(
+class OurSpaceMainViewModel(
     private val authPairingRepository: AuthPairingRepository,
     private val personalRepository: PersonalSpaceRepository,
     private val sharedRepository: SharedSpaceRepository,
@@ -142,6 +139,18 @@ class OurSpaceMainViewModel @Inject constructor(
     init {
         val currentUid = authPairingRepository.currentUserUid ?: "user_me_01"
         _sessionState.value = _sessionState.value.copy(currentUid = currentUid)
+
+        viewModelScope.launch {
+            preferencesRepository.preferencesFlow.collect { prefs ->
+                _sessionState.value = _sessionState.value.copy(
+                    myDisplayName = prefs.myDisplayName,
+                    myNickname = prefs.myNickname,
+                    partnerNickname = prefs.cachedPartnerNickname,
+                    anniversaryMillis = prefs.anniversaryMillis
+                )
+            }
+        }
+
         sharedRepository.startRealtimeSyncForCouple(_sessionState.value.coupleId)
         seedInitialStarterDataIfNeeded()
     }
@@ -290,16 +299,48 @@ class OurSpaceMainViewModel @Inject constructor(
         }
     }
 
-    fun updateProfileNames(displayName: String, nickname: String, partnerNickname: String) {
+    fun updateProfileAndAnniversary(
+        displayName: String,
+        nickname: String,
+        partnerNickname: String,
+        anniversaryMillis: Long
+    ) {
         viewModelScope.launch {
             val s = _sessionState.value
-            _sessionState.value = s.copy(
-                myDisplayName = displayName.ifBlank { s.myDisplayName },
-                myNickname = nickname.ifBlank { s.myNickname },
-                partnerNickname = partnerNickname.ifBlank { s.partnerNickname },
-                statusMessage = "Profil berhasil diperbarui."
+            val finalDisplay = displayName.ifBlank { s.myDisplayName }
+            val finalNick = nickname.ifBlank { s.myNickname }
+            val finalPartner = partnerNickname.ifBlank { s.partnerNickname }
+
+            preferencesRepository.saveProfileAndAnniversary(
+                displayName = finalDisplay,
+                myNickname = finalNick,
+                partnerNickname = finalPartner,
+                anniversaryMillis = anniversaryMillis
             )
-            preferencesRepository.updateCachedCoupleSession(s.coupleId, partnerNickname)
+
+            _sessionState.value = s.copy(
+                myDisplayName = finalDisplay,
+                myNickname = finalNick,
+                partnerNickname = finalPartner,
+                anniversaryMillis = anniversaryMillis,
+                statusMessage = "Profil & Tanggal Jadian berhasil disimpan!"
+            )
+        }
+    }
+
+    fun updateProfileNames(displayName: String, nickname: String, partnerNickname: String) {
+        val s = _sessionState.value
+        updateProfileAndAnniversary(
+            displayName = displayName,
+            nickname = nickname,
+            partnerNickname = partnerNickname,
+            anniversaryMillis = s.anniversaryMillis
+        )
+    }
+
+    fun deleteSharedNote(noteId: String) {
+        viewModelScope.launch {
+            sharedRepository.deleteSharedNote(_sessionState.value.coupleId, noteId)
         }
     }
 

@@ -8,20 +8,15 @@ import androidx.core.app.NotificationCompat
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import com.ourspace.app.data.local.preferences.UserPreferencesRepository
-import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
-@AndroidEntryPoint
 class OurSpaceMessagingService : FirebaseMessagingService() {
 
-    @Inject
-    lateinit var preferencesRepository: UserPreferencesRepository
-
+    private val preferencesRepository by lazy { UserPreferencesRepository(applicationContext) }
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onMessageReceived(message: RemoteMessage) {

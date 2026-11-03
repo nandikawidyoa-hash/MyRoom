@@ -1,161 +1,337 @@
 package com.ourspace.app.data.local.db
 
-import androidx.room.Dao
-import androidx.room.Insert
-import androidx.room.OnConflictStrategy
-import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
+import java.util.concurrent.atomic.AtomicLong
 
-@Dao
-interface PersonalSpaceDao {
-    @Query(
-        "SELECT * FROM personal_notes WHERE ownerUid = :uid AND (:query = '' OR title LIKE '%' || :query || '%' OR content LIKE '%' || :query || '%') AND (:category = 'All' OR category = :category) ORDER BY isPinned DESC, updatedAt DESC"
-    )
-    fun observePersonalNotes(uid: String, query: String, category: String): Flow<List<PersonalNoteEntity>>
+class PersonalSpaceDao {
+    private val notesFlow = MutableStateFlow<List<PersonalNoteEntity>>(emptyList())
+    private val diaryFlow = MutableStateFlow<List<PersonalDiaryEntity>>(emptyList())
+    private val tasksFlow = MutableStateFlow<List<PersonalTaskEntity>>(emptyList())
+    private val collectionsFlow = MutableStateFlow<List<PrivateCollectionItemEntity>>(emptyList())
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertPersonalNote(note: PersonalNoteEntity)
+    fun observePersonalNotes(uid: String, query: String, category: String): Flow<List<PersonalNoteEntity>> =
+        notesFlow.map { list ->
+            list.filter { it.ownerUid == uid }
+                .filter { category == "All" || it.category.equals(category, ignoreCase = true) }
+                .filter {
+                    query.isBlank() ||
+                        it.title.contains(query, ignoreCase = true) ||
+                        it.content.contains(query, ignoreCase = true)
+                }
+                .sortedWith(compareByDescending<PersonalNoteEntity> { it.isPinned }.thenByDescending { it.updatedAt })
+        }
 
-    @Query("DELETE FROM personal_notes WHERE id = :noteId AND ownerUid = :uid")
-    suspend fun deletePersonalNote(noteId: String, uid: String)
+    suspend fun upsertPersonalNote(note: PersonalNoteEntity) {
+        notesFlow.update { current ->
+            current.filterNot { it.id == note.id } + note
+        }
+    }
 
-    @Query("SELECT * FROM personal_diary_entries WHERE ownerUid = :uid ORDER BY entryDateMillis DESC")
-    fun observePersonalDiary(uid: String): Flow<List<PersonalDiaryEntity>>
+    suspend fun deletePersonalNote(noteId: String, uid: String) {
+        notesFlow.update { current ->
+            current.filterNot { it.id == noteId && it.ownerUid == uid }
+        }
+    }
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertPersonalDiary(entry: PersonalDiaryEntity)
+    fun observePersonalDiary(uid: String): Flow<List<PersonalDiaryEntity>> =
+        diaryFlow.map { list ->
+            list.filter { it.ownerUid == uid }
+                .sortedByDescending { it.entryDateMillis }
+        }
 
-    @Query("DELETE FROM personal_diary_entries WHERE id = :entryId AND ownerUid = :uid")
-    suspend fun deletePersonalDiary(entryId: String, uid: String)
+    suspend fun upsertPersonalDiary(entry: PersonalDiaryEntity) {
+        diaryFlow.update { current ->
+            current.filterNot { it.id == entry.id } + entry
+        }
+    }
 
-    @Query("SELECT * FROM personal_tasks WHERE ownerUid = :uid ORDER BY isCompleted ASC, COALESCE(dueDateMillis, 9223372036854775807) ASC, updatedAt DESC")
-    fun observePersonalTasks(uid: String): Flow<List<PersonalTaskEntity>>
+    suspend fun deletePersonalDiary(entryId: String, uid: String) {
+        diaryFlow.update { current ->
+            current.filterNot { it.id == entryId && it.ownerUid == uid }
+        }
+    }
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertPersonalTask(task: PersonalTaskEntity)
+    fun observePersonalTasks(uid: String): Flow<List<PersonalTaskEntity>> =
+        tasksFlow.map { list ->
+            list.filter { it.ownerUid == uid }
+                .sortedWith(
+                    compareBy<PersonalTaskEntity> { it.isCompleted }
+                        .thenBy { it.dueDateMillis ?: Long.MAX_VALUE }
+                        .thenByDescending { it.updatedAt }
+                )
+        }
 
-    @Query("DELETE FROM personal_tasks WHERE id = :taskId AND ownerUid = :uid")
-    suspend fun deletePersonalTask(taskId: String, uid: String)
+    suspend fun upsertPersonalTask(task: PersonalTaskEntity) {
+        tasksFlow.update { current ->
+            current.filterNot { it.id == task.id } + task
+        }
+    }
 
-    @Query("SELECT * FROM private_collections WHERE ownerUid = :uid ORDER BY updatedAt DESC")
-    fun observePrivateCollection(uid: String): Flow<List<PrivateCollectionItemEntity>>
+    suspend fun deletePersonalTask(taskId: String, uid: String) {
+        tasksFlow.update { current ->
+            current.filterNot { it.id == taskId && it.ownerUid == uid }
+        }
+    }
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertPrivateCollectionItem(item: PrivateCollectionItemEntity)
+    fun observePrivateCollection(uid: String): Flow<List<PrivateCollectionItemEntity>> =
+        collectionsFlow.map { list ->
+            list.filter { it.ownerUid == uid }
+                .sortedByDescending { it.updatedAt }
+        }
 
-    @Query("DELETE FROM private_collections WHERE id = :itemId AND ownerUid = :uid")
-    suspend fun deletePrivateCollectionItem(itemId: String, uid: String)
+    suspend fun upsertPrivateCollectionItem(item: PrivateCollectionItemEntity) {
+        collectionsFlow.update { current ->
+            current.filterNot { it.id == item.id } + item
+        }
+    }
+
+    suspend fun deletePrivateCollectionItem(itemId: String, uid: String) {
+        collectionsFlow.update { current ->
+            current.filterNot { it.id == itemId && it.ownerUid == uid }
+        }
+    }
 }
 
-@Dao
-interface SharedSpaceDao {
-    @Query("SELECT * FROM shared_notes WHERE coupleId = :coupleId ORDER BY updatedAt DESC")
-    fun observeSharedNotes(coupleId: String): Flow<List<SharedNoteEntity>>
+class SharedSpaceDao {
+    private val notesFlow = MutableStateFlow<List<SharedNoteEntity>>(emptyList())
+    private val diaryFlow = MutableStateFlow<List<SharedDiaryEntity>>(emptyList())
+    private val tasksFlow = MutableStateFlow<List<SharedTaskEntity>>(emptyList())
+    private val eventsFlow = MutableStateFlow<List<SharedEventEntity>>(emptyList())
+    private val bucketFlow = MutableStateFlow<List<BucketListItemEntity>>(emptyList())
+    private val messagesFlow = MutableStateFlow<List<SharedMessageEntity>>(emptyList())
+    private val memoriesFlow = MutableStateFlow<List<MemoryEntity>>(emptyList())
+    private val capsulesFlow = MutableStateFlow<List<TimeCapsuleEntity>>(emptyList())
+    private val surprisesFlow = MutableStateFlow<List<SurpriseItemEntity>>(emptyList())
 
-    @Query("SELECT * FROM shared_notes WHERE id = :noteId LIMIT 1")
-    suspend fun getSharedNoteById(noteId: String): SharedNoteEntity?
+    fun observeSharedNotes(coupleId: String): Flow<List<SharedNoteEntity>> =
+        notesFlow.map { list ->
+            list.filter { it.coupleId == coupleId }
+                .sortedByDescending { it.updatedAt }
+        }
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertSharedNote(note: SharedNoteEntity)
+    suspend fun getSharedNoteById(noteId: String): SharedNoteEntity? =
+        notesFlow.value.find { it.id == noteId }
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertSharedNotes(notes: List<SharedNoteEntity>)
+    suspend fun upsertSharedNote(note: SharedNoteEntity) {
+        notesFlow.update { current ->
+            current.filterNot { it.id == note.id } + note
+        }
+    }
 
-    @Query("DELETE FROM shared_notes WHERE id = :noteId")
-    suspend fun deleteSharedNote(noteId: String)
+    suspend fun upsertSharedNotes(notes: List<SharedNoteEntity>) {
+        notesFlow.update { current ->
+            val newIds = notes.map { it.id }.toSet()
+            current.filterNot { it.id in newIds } + notes
+        }
+    }
 
-    @Query("SELECT * FROM shared_diary WHERE coupleId = :coupleId ORDER BY entryDateMillis DESC")
-    fun observeSharedDiary(coupleId: String): Flow<List<SharedDiaryEntity>>
+    suspend fun deleteSharedNote(noteId: String) {
+        notesFlow.update { current ->
+            current.filterNot { it.id == noteId }
+        }
+    }
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertSharedDiary(entry: SharedDiaryEntity)
+    fun observeSharedDiary(coupleId: String): Flow<List<SharedDiaryEntity>> =
+        diaryFlow.map { list ->
+            list.filter { it.coupleId == coupleId }
+                .sortedByDescending { it.entryDateMillis }
+        }
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertSharedDiaries(entries: List<SharedDiaryEntity>)
+    suspend fun upsertSharedDiary(entry: SharedDiaryEntity) {
+        diaryFlow.update { current ->
+            current.filterNot { it.id == entry.id } + entry
+        }
+    }
 
-    @Query("SELECT * FROM shared_tasks WHERE coupleId = :coupleId ORDER BY isCompleted ASC, COALESCE(dueDateMillis, 9223372036854775807) ASC")
-    fun observeSharedTasks(coupleId: String): Flow<List<SharedTaskEntity>>
+    suspend fun upsertSharedDiaries(entries: List<SharedDiaryEntity>) {
+        diaryFlow.update { current ->
+            val newIds = entries.map { it.id }.toSet()
+            current.filterNot { it.id in newIds } + entries
+        }
+    }
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertSharedTask(task: SharedTaskEntity)
+    fun observeSharedTasks(coupleId: String): Flow<List<SharedTaskEntity>> =
+        tasksFlow.map { list ->
+            list.filter { it.coupleId == coupleId }
+                .sortedWith(
+                    compareBy<SharedTaskEntity> { it.isCompleted }
+                        .thenBy { it.dueDateMillis ?: Long.MAX_VALUE }
+                )
+        }
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertSharedTasks(tasks: List<SharedTaskEntity>)
+    suspend fun upsertSharedTask(task: SharedTaskEntity) {
+        tasksFlow.update { current ->
+            current.filterNot { it.id == task.id } + task
+        }
+    }
 
-    @Query("DELETE FROM shared_tasks WHERE id = :taskId")
-    suspend fun deleteSharedTask(taskId: String)
+    suspend fun upsertSharedTasks(tasks: List<SharedTaskEntity>) {
+        tasksFlow.update { current ->
+            val newIds = tasks.map { it.id }.toSet()
+            current.filterNot { it.id in newIds } + tasks
+        }
+    }
 
-    @Query("SELECT * FROM shared_events WHERE coupleId = :coupleId ORDER BY eventDateMillis ASC")
-    fun observeSharedEvents(coupleId: String): Flow<List<SharedEventEntity>>
+    suspend fun deleteSharedTask(taskId: String) {
+        tasksFlow.update { current ->
+            current.filterNot { it.id == taskId }
+        }
+    }
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertSharedEvent(event: SharedEventEntity)
+    fun observeSharedEvents(coupleId: String): Flow<List<SharedEventEntity>> =
+        eventsFlow.map { list ->
+            list.filter { it.coupleId == coupleId }
+                .sortedBy { it.eventDateMillis }
+        }
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertSharedEvents(events: List<SharedEventEntity>)
+    suspend fun upsertSharedEvent(event: SharedEventEntity) {
+        eventsFlow.update { current ->
+            current.filterNot { it.id == event.id } + event
+        }
+    }
 
-    @Query("SELECT * FROM shared_bucket_list WHERE coupleId = :coupleId ORDER BY isCompleted ASC, updatedAt DESC")
-    fun observeBucketList(coupleId: String): Flow<List<BucketListItemEntity>>
+    suspend fun upsertSharedEvents(events: List<SharedEventEntity>) {
+        eventsFlow.update { current ->
+            val newIds = events.map { it.id }.toSet()
+            current.filterNot { it.id in newIds } + events
+        }
+    }
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertBucketListItem(item: BucketListItemEntity)
+    fun observeBucketList(coupleId: String): Flow<List<BucketListItemEntity>> =
+        bucketFlow.map { list ->
+            list.filter { it.coupleId == coupleId }
+                .sortedWith(
+                    compareBy<BucketListItemEntity> { it.isCompleted }
+                        .thenByDescending { it.updatedAt }
+                )
+        }
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertBucketListItems(items: List<BucketListItemEntity>)
+    suspend fun upsertBucketListItem(item: BucketListItemEntity) {
+        bucketFlow.update { current ->
+            current.filterNot { it.id == item.id } + item
+        }
+    }
 
-    @Query("SELECT * FROM shared_messages WHERE coupleId = :coupleId ORDER BY createdAt DESC")
-    fun observeSharedMessages(coupleId: String): Flow<List<SharedMessageEntity>>
+    suspend fun upsertBucketListItems(items: List<BucketListItemEntity>) {
+        bucketFlow.update { current ->
+            val newIds = items.map { it.id }.toSet()
+            current.filterNot { it.id in newIds } + items
+        }
+    }
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertSharedMessage(message: SharedMessageEntity)
+    fun observeSharedMessages(coupleId: String): Flow<List<SharedMessageEntity>> =
+        messagesFlow.map { list ->
+            list.filter { it.coupleId == coupleId }
+                .sortedByDescending { it.createdAt }
+        }
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertSharedMessages(messages: List<SharedMessageEntity>)
+    suspend fun upsertSharedMessage(message: SharedMessageEntity) {
+        messagesFlow.update { current ->
+            current.filterNot { it.id == message.id } + message
+        }
+    }
 
-    @Query(
-        "SELECT * FROM memories WHERE coupleId = :coupleId AND (:searchQuery = '' OR caption LIKE '%' || :searchQuery || '%' OR albumTitle LIKE '%' || :searchQuery || '%') ORDER BY memoryDateMillis DESC"
-    )
-    fun observeMemories(coupleId: String, searchQuery: String = ""): Flow<List<MemoryEntity>>
+    suspend fun upsertSharedMessages(messages: List<SharedMessageEntity>) {
+        messagesFlow.update { current ->
+            val newIds = messages.map { it.id }.toSet()
+            current.filterNot { it.id in newIds } + messages
+        }
+    }
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertMemory(memory: MemoryEntity)
+    fun observeMemories(coupleId: String, searchQuery: String = ""): Flow<List<MemoryEntity>> =
+        memoriesFlow.map { list ->
+            list.filter { it.coupleId == coupleId }
+                .filter {
+                    searchQuery.isBlank() ||
+                        it.caption.contains(searchQuery, ignoreCase = true) ||
+                        it.albumTitle.contains(searchQuery, ignoreCase = true)
+                }
+                .sortedByDescending { it.memoryDateMillis }
+        }
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertMemories(memories: List<MemoryEntity>)
+    suspend fun upsertMemory(memory: MemoryEntity) {
+        memoriesFlow.update { current ->
+            current.filterNot { it.id == memory.id } + memory
+        }
+    }
 
-    @Query("SELECT * FROM time_capsules WHERE coupleId = :coupleId ORDER BY unlockAtServerMillis ASC")
-    fun observeTimeCapsules(coupleId: String): Flow<List<TimeCapsuleEntity>>
+    suspend fun upsertMemories(memories: List<MemoryEntity>) {
+        memoriesFlow.update { current ->
+            val newIds = memories.map { it.id }.toSet()
+            current.filterNot { it.id in newIds } + memories
+        }
+    }
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertTimeCapsule(capsule: TimeCapsuleEntity)
+    fun observeTimeCapsules(coupleId: String): Flow<List<TimeCapsuleEntity>> =
+        capsulesFlow.map { list ->
+            list.filter { it.coupleId == coupleId }
+                .sortedBy { it.unlockAtServerMillis }
+        }
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertTimeCapsules(capsules: List<TimeCapsuleEntity>)
+    suspend fun upsertTimeCapsule(capsule: TimeCapsuleEntity) {
+        capsulesFlow.update { current ->
+            current.filterNot { it.id == capsule.id } + capsule
+        }
+    }
 
-    @Query("SELECT * FROM surprise_items WHERE coupleId = :coupleId ORDER BY scheduledRevealServerMillis ASC")
-    fun observeSurprises(coupleId: String): Flow<List<SurpriseItemEntity>>
+    suspend fun upsertTimeCapsules(capsules: List<TimeCapsuleEntity>) {
+        capsulesFlow.update { current ->
+            val newIds = capsules.map { it.id }.toSet()
+            current.filterNot { it.id in newIds } + capsules
+        }
+    }
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertSurprise(surprise: SurpriseItemEntity)
+    fun observeSurprises(coupleId: String): Flow<List<SurpriseItemEntity>> =
+        surprisesFlow.map { list ->
+            list.filter { it.coupleId == coupleId }
+                .sortedBy { it.scheduledRevealServerMillis }
+        }
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertSurprises(surprises: List<SurpriseItemEntity>)
+    suspend fun upsertSurprise(surprise: SurpriseItemEntity) {
+        surprisesFlow.update { current ->
+            current.filterNot { it.id == surprise.id } + surprise
+        }
+    }
+
+    suspend fun upsertSurprises(surprises: List<SurpriseItemEntity>) {
+        surprisesFlow.update { current ->
+            val newIds = surprises.map { it.id }.toSet()
+            current.filterNot { it.id in newIds } + surprises
+        }
+    }
 }
 
-@Dao
-interface PendingSyncQueueDao {
-    @Query("SELECT * FROM pending_sync_queue ORDER BY createdAt ASC")
-    suspend fun getAllPendingOperations(): List<PendingSyncOperationEntity>
+class PendingSyncQueueDao {
+    private val queueFlow = MutableStateFlow<List<PendingSyncOperationEntity>>(emptyList())
+    private val nextOpId = AtomicLong(1L)
 
-    @Query("SELECT COUNT(*) FROM pending_sync_queue")
-    fun observePendingCount(): Flow<Int>
+    suspend fun getAllPendingOperations(): List<PendingSyncOperationEntity> =
+        queueFlow.value.sortedBy { it.createdAt }
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun enqueue(operation: PendingSyncOperationEntity)
+    fun observePendingCount(): Flow<Int> =
+        queueFlow.map { it.size }
 
-    @Query("DELETE FROM pending_sync_queue WHERE opId = :opId")
-    suspend fun deleteOperation(opId: Long)
+    suspend fun enqueue(operation: PendingSyncOperationEntity) {
+        val assigned = if (operation.opId <= 0L) operation.copy(opId = nextOpId.getAndIncrement()) else operation
+        queueFlow.update { current ->
+            current.filterNot { it.opId == assigned.opId } + assigned
+        }
+    }
 
-    @Query("UPDATE pending_sync_queue SET retryCount = retryCount + 1, lastError = :error WHERE opId = :opId")
-    suspend fun markRetry(opId: Long, error: String?)
+    suspend fun deleteOperation(opId: Long) {
+        queueFlow.update { current ->
+            current.filterNot { it.opId == opId }
+        }
+    }
+
+    suspend fun markRetry(opId: Long, error: String?) {
+        queueFlow.update { current ->
+            current.map {
+                if (it.opId == opId) it.copy(retryCount = it.retryCount + 1, lastError = error) else it
+            }
+        }
+    }
 }

@@ -6,14 +6,12 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.ourspace.app.ui.theme.AppThemeMode
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import javax.inject.Inject
-import javax.inject.Singleton
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "our_space_preferences")
 
@@ -29,12 +27,14 @@ data class AppUserPreferences(
     val notifyCalendarEvents: Boolean = true,
     val notifySurprises: Boolean = true,
     val cachedCoupleId: String? = null,
-    val cachedPartnerNickname: String = "My Love"
+    val cachedPartnerNickname: String = "Raka",
+    val myDisplayName: String = "Alya Putri",
+    val myNickname: String = "Alya",
+    val anniversaryMillis: Long = System.currentTimeMillis() - (365L * 24L * 60L * 60L * 1000L)
 )
 
-@Singleton
-class UserPreferencesRepository @Inject constructor(
-    @ApplicationContext private val context: Context
+class UserPreferencesRepository(
+    private val context: Context
 ) {
     private object Keys {
         val THEME_MODE = stringPreferencesKey("theme_mode")
@@ -49,11 +49,15 @@ class UserPreferencesRepository @Inject constructor(
         val NOTIFY_SURPRISES = booleanPreferencesKey("notify_surprises")
         val CACHED_COUPLE_ID = stringPreferencesKey("cached_couple_id")
         val CACHED_PARTNER_NICKNAME = stringPreferencesKey("cached_partner_nickname")
+        val MY_DISPLAY_NAME = stringPreferencesKey("my_display_name")
+        val MY_NICKNAME = stringPreferencesKey("my_nickname")
+        val ANNIVERSARY_MILLIS = longPreferencesKey("anniversary_millis")
     }
 
     val preferencesFlow: Flow<AppUserPreferences> = context.dataStore.data.map { prefs ->
         val modeName = prefs[Keys.THEME_MODE] ?: AppThemeMode.LIGHT.name
         val themeMode = runCatching { AppThemeMode.valueOf(modeName) }.getOrDefault(AppThemeMode.LIGHT)
+        val defaultAnniversary = System.currentTimeMillis() - (365L * 24L * 60L * 60L * 1000L)
 
         AppUserPreferences(
             themeMode = themeMode,
@@ -67,7 +71,10 @@ class UserPreferencesRepository @Inject constructor(
             notifyCalendarEvents = prefs[Keys.NOTIFY_CALENDAR] ?: true,
             notifySurprises = prefs[Keys.NOTIFY_SURPRISES] ?: true,
             cachedCoupleId = prefs[Keys.CACHED_COUPLE_ID],
-            cachedPartnerNickname = prefs[Keys.CACHED_PARTNER_NICKNAME] ?: "My Love"
+            cachedPartnerNickname = prefs[Keys.CACHED_PARTNER_NICKNAME] ?: "Raka",
+            myDisplayName = prefs[Keys.MY_DISPLAY_NAME] ?: "Alya Putri",
+            myNickname = prefs[Keys.MY_NICKNAME] ?: "Alya",
+            anniversaryMillis = prefs[Keys.ANNIVERSARY_MILLIS] ?: defaultAnniversary
         )
     }
 
@@ -87,6 +94,20 @@ class UserPreferencesRepository @Inject constructor(
         context.dataStore.edit { prefs ->
             if (coupleId != null) prefs[Keys.CACHED_COUPLE_ID] = coupleId else prefs.remove(Keys.CACHED_COUPLE_ID)
             if (partnerNickname != null) prefs[Keys.CACHED_PARTNER_NICKNAME] = partnerNickname
+        }
+    }
+
+    suspend fun saveProfileAndAnniversary(
+        displayName: String,
+        myNickname: String,
+        partnerNickname: String,
+        anniversaryMillis: Long
+    ) {
+        context.dataStore.edit { prefs ->
+            prefs[Keys.MY_DISPLAY_NAME] = displayName
+            prefs[Keys.MY_NICKNAME] = myNickname
+            prefs[Keys.CACHED_PARTNER_NICKNAME] = partnerNickname
+            prefs[Keys.ANNIVERSARY_MILLIS] = anniversaryMillis
         }
     }
 }

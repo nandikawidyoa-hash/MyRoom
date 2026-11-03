@@ -1,7 +1,6 @@
 package com.ourspace.app.data.sync
 
 import android.content.Context
-import androidx.hilt.work.HiltWorker
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -12,23 +11,20 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
-import com.ourspace.app.data.local.db.PendingSyncQueueDao
-import com.ourspace.app.data.local.db.SharedSpaceDao
-import dagger.assisted.Assisted
-import dagger.assisted.AssistedInject
+import com.ourspace.app.di.OurSpaceContainer
 import kotlinx.coroutines.tasks.await
 import java.util.concurrent.TimeUnit
 
-@HiltWorker
-class OfflineSyncWorker @AssistedInject constructor(
-    @Assisted appContext: Context,
-    @Assisted workerParams: WorkerParameters,
-    private val syncQueueDao: PendingSyncQueueDao,
-    private val sharedSpaceDao: SharedSpaceDao,
-    private val firestore: FirebaseFirestore
+class OfflineSyncWorker(
+    appContext: Context,
+    workerParams: WorkerParameters
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
+        val syncQueueDao = OurSpaceContainer.syncQueueDao
+        val sharedSpaceDao = OurSpaceContainer.sharedDao
+        val firestore = FirebaseFirestore.getInstance()
+
         val operations = syncQueueDao.getAllPendingOperations()
         if (operations.isEmpty()) return Result.success()
 

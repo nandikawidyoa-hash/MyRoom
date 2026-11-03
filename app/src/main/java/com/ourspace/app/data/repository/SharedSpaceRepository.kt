@@ -20,7 +20,6 @@ import com.ourspace.app.data.local.db.SharedSpaceDao
 import com.ourspace.app.data.local.db.SharedTaskEntity
 import com.ourspace.app.data.local.db.SurpriseItemEntity
 import com.ourspace.app.data.local.db.TimeCapsuleEntity
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -29,8 +28,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.io.ByteArrayOutputStream
 import java.util.UUID
-import javax.inject.Inject
-import javax.inject.Singleton
 
 enum class ConflictResolutionStrategy {
     KEEP_MINE,
@@ -38,9 +35,8 @@ enum class ConflictResolutionStrategy {
     MERGE_BOTH
 }
 
-@Singleton
-class SharedSpaceRepository @Inject constructor(
-    @ApplicationContext private val context: Context,
+class SharedSpaceRepository(
+    private val context: Context,
     private val sharedDao: SharedSpaceDao,
     private val syncQueueDao: PendingSyncQueueDao,
     private val firestore: FirebaseFirestore,
@@ -137,6 +133,15 @@ class SharedSpaceRepository @Inject constructor(
         activeListeners.forEach { runCatching { it.remove() } }
         activeListeners.clear()
         listeningCoupleId = null
+    }
+
+    suspend fun deleteSharedNote(coupleId: String, noteId: String) {
+        sharedDao.deleteSharedNote(noteId)
+        runCatching {
+            firestore.collection("couples").document(coupleId)
+                .collection("sharedNotes").document(noteId)
+                .delete().await()
+        }
     }
 
     suspend fun saveSharedNote(
@@ -244,7 +249,11 @@ class SharedSpaceRepository @Inject constructor(
         val resolvedContent = when (strategy) {
             ConflictResolutionStrategy.KEEP_MINE -> note.content
             ConflictResolutionStrategy.KEEP_PARTNER -> partnerContent
-            ConflictResolutionStrategy.MERGE_BOTH -> "${note.content} | [Merged Partner]: $partnerContent"
+            ConflictResolutionStrategy.MERGE_BOTH ->
+                "${note.content}
+
+[Merged Partner Changes]:
+$partnerContent"
         }
         val resolvedEntity = note.copy(
             content = resolvedContent,

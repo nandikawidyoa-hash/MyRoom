@@ -14,6 +14,10 @@ import com.ourspace.app.data.repository.SharedSpaceRepository
 import com.ourspace.app.ui.viewmodel.OurSpaceMainViewModel
 
 object OurSpaceContainer {
+    val personalDao: PersonalSpaceDao by lazy { PersonalSpaceDao() }
+    val sharedDao: SharedSpaceDao by lazy { SharedSpaceDao() }
+    val syncQueueDao: PendingSyncQueueDao by lazy { PendingSyncQueueDao() }
+
     @Volatile
     private var instance: OurSpaceMainViewModel? = null
 
@@ -25,9 +29,6 @@ object OurSpaceContainer {
 
     private fun createViewModel(appContext: Context): OurSpaceMainViewModel {
         val prefsRepo = UserPreferencesRepository(appContext)
-        val personalDao = PersonalSpaceDao()
-        val sharedDao = SharedSpaceDao()
-        val syncQueueDao = PendingSyncQueueDao()
 
         val auth = FirebaseAuth.getInstance()
         val firestore = FirebaseFirestore.getInstance()

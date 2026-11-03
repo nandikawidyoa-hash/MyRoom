@@ -109,7 +109,10 @@ class OurSpaceComprehensiveTest {
             ConflictResolutionStrategy.KEEP_MINE -> conflictedNote.content
             ConflictResolutionStrategy.KEEP_PARTNER -> conflictedNote.conflictServerContent.orEmpty()
             ConflictResolutionStrategy.MERGE_BOTH ->
-                "${conflictedNote.content} | [Merged Partner]: ${conflictedNote.conflictServerContent}"
+                "${conflictedNote.content}
+
+[Merged Partner Changes]:
+${conflictedNote.conflictServerContent}"
         }
 
         assertTrue(merged.contains("Bring camera and tripod"))

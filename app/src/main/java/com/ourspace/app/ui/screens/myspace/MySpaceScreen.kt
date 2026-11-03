@@ -14,6 +14,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -212,24 +213,60 @@ fun MySpaceScreen(viewModel: OurSpaceMainViewModel) {
                     )
                 }
 
+                readingNote?.let { rNote ->
+                    AlertDialog(
+                        onDismissRequest = { readingNote = null },
+                        title = { Text(rNote.title, style = MaterialTheme.typography.headlineSmall, color = colors.textPrimary) },
+                        text = {
+                            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                                Text("Kategori: ${rNote.category}", style = MaterialTheme.typography.labelSmall, color = colors.primaryAccent)
+                                Spacer(Modifier.height(8.dp))
+                                Text(rNote.content, style = MaterialTheme.typography.bodyLarge, color = colors.textPrimary)
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { readingNote = null }) {
+                                Text("Tutup")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = {
+                                viewModel.deletePersonalNote(rNote.id)
+                                readingNote = null
+                            }) {
+                                Text("Hapus Catatan", color = MaterialTheme.colorScheme.error)
+                            }
+                        }
+                    )
+                }
+
                 notes.forEach { note ->
-                    RomanticGlassCard(modifier = Modifier.fillMaxWidth()) {
+                    RomanticGlassCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { readingNote = note }
+                    ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
                                 text = "${if (note.isPinned) "📌 " else ""}${if (note.isFavorite) "⭐ " else ""}${note.title}",
                                 style = MaterialTheme.typography.titleMedium,
                                 color = colors.textPrimary
                             )
-                            TextButton(onClick = { viewModel.deletePersonalNote(note.id) }) {
-                                Text("Hapus")
+                            Row {
+                                TextButton(onClick = { readingNote = note }) {
+                                    Text("Baca")
+                                }
+                                TextButton(onClick = { viewModel.deletePersonalNote(note.id) }) {
+                                    Text("Hapus", color = MaterialTheme.colorScheme.error)
+                                }
                             }
                         }
-                        Text(note.content, style = MaterialTheme.typography.bodyMedium, color = colors.textPrimary)
+                        Text(note.content.take(120) + if (note.content.length > 120) "..." else "", style = MaterialTheme.typography.bodyMedium, color = colors.textPrimary)
                         Spacer(Modifier.height(4.dp))
-                        Text("Kategori: ${note.category}", style = MaterialTheme.typography.labelSmall, color = colors.textMuted)
+                        Text("Kategori: ${note.category} • Ketuk untuk membaca lengkap", style = MaterialTheme.typography.labelSmall, color = colors.textMuted)
                     }
                 }
             }

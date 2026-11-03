@@ -15,6 +15,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
@@ -56,6 +58,7 @@ fun OurSpaceScreen(viewModel: OurSpaceMainViewModel) {
     val sharedMessages by viewModel.sharedMessages.collectAsState()
 
     var selectedTab by rememberSaveable { mutableStateOf(OurSpaceTab.SHARED_NOTES) }
+    var readingSharedNote by remember { mutableStateOf<com.ourspace.app.data.local.db.SharedNoteEntity?>(null) }
     val colors = OurSpaceDesign.colors
 
     Column(
@@ -116,14 +119,66 @@ fun OurSpaceScreen(viewModel: OurSpaceMainViewModel) {
                     )
                 }
 
+                readingSharedNote?.let { rNote ->
+                    AlertDialog(
+                        onDismissRequest = { readingSharedNote = null },
+                        title = { Text(rNote.title, style = MaterialTheme.typography.headlineSmall, color = colors.textPrimary) },
+                        text = {
+                            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                                Text(
+                                    "Kategori: ${rNote.category} • Terakhir diedit oleh ${rNote.lastEditedByNickname} (v${rNote.version})",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = colors.primaryAccent
+                                )
+                                Spacer(Modifier.height(8.dp))
+                                Text(rNote.content, style = MaterialTheme.typography.bodyLarge, color = colors.textPrimary)
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { readingSharedNote = null }) {
+                                Text("Tutup")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = {
+                                viewModel.deleteSharedNote(rNote.id)
+                                readingSharedNote = null
+                            }) {
+                                Text("Hapus Catatan", color = MaterialTheme.colorScheme.error)
+                            }
+                        }
+                    )
+                }
+
                 sharedNotes.forEach { note ->
-                    RomanticGlassCard(modifier = Modifier.fillMaxWidth()) {
-                        Text("${note.title} (v${note.version})", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
+                    RomanticGlassCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { readingSharedNote = note }
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "${note.title} (v${note.version})",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = colors.textPrimary
+                            )
+                            Row {
+                                TextButton(onClick = { readingSharedNote = note }) {
+                                    Text("Baca")
+                                }
+                                TextButton(onClick = { viewModel.deleteSharedNote(note.id) }) {
+                                    Text("Hapus", color = MaterialTheme.colorScheme.error)
+                                }
+                            }
+                        }
                         Spacer(Modifier.height(4.dp))
-                        Text(note.content, style = MaterialTheme.typography.bodyMedium, color = colors.textPrimary)
+                        Text(note.content.take(120) + if (note.content.length > 120) "..." else "", style = MaterialTheme.typography.bodyMedium, color = colors.textPrimary)
                         Spacer(Modifier.height(6.dp))
                         Text(
-                            "Terakhir diedit oleh ${note.lastEditedByNickname} • Status: ${note.syncStatus}",
+                            "Terakhir diedit oleh ${note.lastEditedByNickname} • Status: ${note.syncStatus} • Ketuk untuk baca lengkap",
                             style = MaterialTheme.typography.labelSmall,
                             color = colors.textMuted
                         )
